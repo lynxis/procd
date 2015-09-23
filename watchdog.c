@@ -45,11 +45,23 @@ static void watchdog_timeout_cb(struct uloop_timeout *t)
 	uloop_timeout_set(t, wdt_frequency * 1000);
 }
 
+static void watchdog_stop()
+{
+	if (wdt_fd >= 0 && write(wdt_fd, "V", 1) < 0)
+		ERROR("WDT failed to write magic close sequence: %s\n"
+		      "WDT may not stopped properly.\n", strerror(errno));
+	if (close(wdt_fd) < 0)
+		ERROR("WDT failed to close watchdog fd: %s\n"
+		      "WDT may not stopped properly.\n", strerror(errno));
+	wdt_fd = -1;
+}
+
 void watchdog_set_stopped(bool val)
 {
-	if (val)
+	if (val) {
 		uloop_timeout_cancel(&wdt_timeout);
-	else
+		watchdog_stop();
+	} else
 		watchdog_timeout_cb(&wdt_timeout);
 }
 
@@ -124,7 +136,6 @@ void watchdog_init(int preinit)
 
 	DEBUG(4, "Opened watchdog with timeout %ds\n", watchdog_timeout(0));
 }
-
 
 void watchdog_no_cloexec(void)
 {
