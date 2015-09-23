@@ -259,28 +259,32 @@ static int watchdog_set(struct ubus_context *ctx, struct ubus_object *obj,
 		return UBUS_STATUS_INVALID_ARGUMENT;
 
 	blobmsg_parse(watchdog_policy, __WDT_MAX, tb, blob_data(msg), blob_len(msg));
-	if (tb[WDT_FREQUENCY]) {
-		unsigned int timeout = watchdog_timeout(0);
-		unsigned int freq = blobmsg_get_u32(tb[WDT_FREQUENCY]);
 
-		if (freq) {
-			if (freq > timeout / 2)
-				freq = timeout / 2;
-			watchdog_frequency(freq);
+	if (tb[WDT_STOP] && blobmsg_get_bool(tb[WDT_STOP]))
+		watchdog_set_stopped(1);
+	else if (tb[WDT_FREQUENCY] || tb[WDT_TIMEOUT]) {
+		watchdog_set_stopped(0);
+
+		if (tb[WDT_FREQUENCY]) {
+			unsigned int timeout = watchdog_timeout(0);
+			unsigned int freq = blobmsg_get_u32(tb[WDT_FREQUENCY]);
+
+			if (freq) {
+				if (freq > timeout / 2)
+					freq = timeout / 2;
+				watchdog_frequency(freq);
+			}
+		}
+
+		if (tb[WDT_TIMEOUT]) {
+			unsigned int timeout = blobmsg_get_u32(tb[WDT_TIMEOUT]);
+			unsigned int frequency = watchdog_frequency(0);
+
+			if (timeout <= frequency)
+				timeout = frequency * 2;
+			watchdog_timeout(timeout);
 		}
 	}
-
-	if (tb[WDT_TIMEOUT]) {
-		unsigned int timeout = blobmsg_get_u32(tb[WDT_TIMEOUT]);
-		unsigned int frequency = watchdog_frequency(0);
-
-		if (timeout <= frequency)
-			timeout = frequency * 2;
-		 watchdog_timeout(timeout);
-	}
-
-	if (tb[WDT_STOP])
-		watchdog_set_stopped(blobmsg_get_bool(tb[WDT_STOP]));
 
 	if (watchdog_fd() == NULL)
 		status = "offline";
